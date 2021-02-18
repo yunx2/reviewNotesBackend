@@ -4,10 +4,35 @@ const cors = require('cors')
 
 const Note = require('./models/note')
 
-const app = express() // commonjs module import
+const app = express() 
 app.use(cors())
 app.use(express.static('build'))
 app.use(express.json()) // data send from frontend (ie in a the body of POST request) is in JSON format, so we need express to parse the JSON
+
+// middleware 
+
+const unknownEndpoint = (request, response) => { // middleware
+  response.status(404).send('error: unknown endpoint')
+}
+
+const errorHandler = (error, request, response, next) => { // express error-handlers are middleware (like all middleware the error-handler accepts parameters 'req', 'res', and, 'next'); it also accepts 'error' as the first parameter because error-first callback pattern is a convention in node
+  console.error(error.message)
+  if (error.name === 'CastError') {
+    return response.status(400).send({ error: 'malformatted id' })
+  } 
+  next(error) // here 'next' is the default express error-handler; this handler only handles 'CastError' errors and passes every other kind of error on to the next middleware
+}
+
+const requestLogger = (request, response, next) => {
+  console.log('Method:', request.method)
+  console.log('Path:  ', request.path)
+  console.log('Body:  ', request.body)
+  console.log('---')
+  next()
+}
+app.use(requestLogger)
+// request handlers
+
 app.post('/api/notes', (request, response) => {
   const body = request.body
 
@@ -67,20 +92,10 @@ app.put('/api/notes/:id', (request, response, next) => {
     .catch(error => next(error))
 })
 
-const unknownEndpoint = (request, response) => { // middleware
-  response.status(404).send('error: unknown endpoint')
-}
-app.use(unknownEndpoint) // middleware added after all routes are defined because it is for catching requests made to non-existent routes
+app.use(unknownEndpoint) // middleware added after all routes are defined because you only want to use this when everything else doesn't work
 
-const errorHandler = (error, request, response, next) => { // express error-handlers are middleware (like all middleware the error-handler accepts parameters 'req', 'res', and, 'next'); it also accepts 'error' as the first parameter because error-first callback pattern is a convention in node
-  console.error(error.message)
-  if (error.name === 'CastError') {
-    return response.status(400).send({ error: 'malformatted id' })
-  } 
-  next(error) // here 'next' is the default express error-handler; this handler only handles 'CastError' errors and passes every other kind of error on to the next middleware
-}
 app.use(errorHandler) 
 
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT
 app.listen(PORT)
 console.log(`Server running on port ${PORT}`)
